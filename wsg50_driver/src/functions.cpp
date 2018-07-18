@@ -131,6 +131,23 @@ int homing( void )
 	return 0;
 }
 
+int homing_async ( void ) {
+	int res;
+	unsigned char payload[1];
+
+	// Set flags: Homing direction (0: default, 1: widthitive movement, 2: negative movement).
+	payload[0] = 0x00;
+
+    // Submit command
+    res = cmd_submit_async( 0x20, payload, 1);
+    if (res < 0) {
+        dbgPrint( "Failed to submit HOMING command\n");
+        return -1;
+    }
+
+	return 0;
+
+}
 
 /** \brief  Send move command (0x21) to gripper
  *  \param  ignore_response Do not read back response from gripper. (Must be read elsewhere, for auto update.)
@@ -184,6 +201,28 @@ int move( float width, float speed, bool stop_on_block, bool ignore_response)
 	return 0;
 }
 
+int move_async( float width, float speed, bool stop_on_block) {
+	int res;
+	unsigned char payload[9];
+
+	// Set flags: Absolute movement (bit 0 is 0), stop on block (bit 1 is 1).
+	payload[0] = 0x00;
+	if (stop_on_block) payload[0] |= 0x02;
+
+	// Copy target width and speed
+	memcpy( &payload[1], &width, sizeof( float ) );
+	memcpy( &payload[5], &speed, sizeof( float ) );
+
+    // Submit command
+    res = cmd_submit_async( 0x21, payload, 9);
+    if (res < 0) {
+        dbgPrint( "Failed to submit move command\n");
+        return -1;
+    }
+
+	return 0;
+}
+
 
 int stop( bool ignore_response )
 {
@@ -197,7 +236,8 @@ int stop( bool ignore_response )
 
     if (!ignore_response) {
         // Submit command and wait for response. Push result to stack.
-        res = cmd_submit( 0x22, payload, 0, true, &resp, &resp_len );
+        res = cmd_submit( 0x22, payload, 0, true, &resp, &resp_len);
+
         if ( res != 2 )
         {
             dbgPrint( "Response payload length doesn't match (is %d, expected 2)\n", res );
@@ -276,7 +316,8 @@ int grasp( float objWidth, float speed )
 	memcpy( &payload[4], &speed, sizeof( float ) );
 
 	// Submit command and wait for response. Push result to stack.
-	res = cmd_submit( 0x25, payload, 8, true, &resp, &resp_len );
+	res = cmd_submit( 0x25, payload, 8, true, &resp, &resp_len);
+
 	if ( res != 2 )
 	{
 		dbgPrint( "Response payload length doesn't match (is %d, expected 2)\n", res );
@@ -287,13 +328,31 @@ int grasp( float objWidth, float speed )
 	// Check response status
 	status = cmd_get_response_status( resp );
 	free( resp );
-	if ( status != E_SUCCESS )
+	if (status != E_SUCCESS && status != E_CMD_PENDING)
 	{
 		dbgPrint( "Command GRASP not successful: %s\n", status_to_str( status ) );
 		return -1;
 	}
 
 	return( 0 );
+}
+
+int grasp_async( float objWidth, float speed ) {
+	int res;
+	unsigned char payload[8];
+
+	// Copy part width and speed
+	memcpy( &payload[0], &objWidth, sizeof( float ) );
+	memcpy( &payload[4], &speed, sizeof( float ) );
+
+    // Submit command
+    res = cmd_submit_async( 0x25, payload, 8);
+    if (res < 0) {
+        dbgPrint( "Failed to submit GRASP command\n");
+        return -1;
+    }
+
+	return 0;
 }
 
 
@@ -310,7 +369,8 @@ int release( float width, float speed )
 	memcpy( &payload[4], &speed, sizeof( float ) );
 
 	// Submit command and wait for response. Push result to stack.
-	res = cmd_submit( 0x26, payload, 8, true, &resp, &resp_len );
+	res = cmd_submit( 0x26, payload, 8, true, &resp, &resp_len);
+
 	if ( res != 2 )
 	{
 		dbgPrint( "Response payload length doesn't match (is %d, expected 2)\n", res );
@@ -321,13 +381,59 @@ int release( float width, float speed )
 	// Check response status
 	status = cmd_get_response_status( resp );
 	free( resp );
-	if ( status != E_SUCCESS )
+	if (status != E_SUCCESS && status != E_CMD_PENDING)
 	{
 		dbgPrint( "Command RELEASE not successful: %s\n", status_to_str( status ) );
 		return -1;
 	}
 
 	return 0;
+}
+
+
+int release_async( float width, float speed ) {
+	int res;
+	unsigned char payload[8];
+
+	// Copy part width and speed
+	memcpy( &payload[0], &width, sizeof( float ) );
+	memcpy( &payload[4], &speed, sizeof( float ) );
+
+    // Submit command
+    res = cmd_submit_async( 0x26, payload, 8);
+    if (res < 0) {
+        dbgPrint( "Failed to submit RELEASE command\n");
+        return -1;
+    }
+
+	return 0;
+}
+
+
+// returns 0 when no msg available, 1 when msg is available and correct, -1 on error
+int recv_ack(unsigned char id, status_t *status) {
+	int res;
+	unsigned char *resp;
+	unsigned int resp_len;
+
+    // Receive response
+    res = cmd_recv_ack(id, &resp, &resp_len);
+
+    if ( res == 0 ) return 0;
+    if ( res < 0 ) return -1;
+
+
+    if ( resp_len > 0 && resp_len != 2 ){
+        dbgPrint( "Response payload length doesn't match (is %d, expected 2)\n", res );
+        free( resp );
+        return -1;
+    }
+
+    // Check response status
+    *status = cmd_get_response_status( resp );
+    free( resp );
+
+	return 1;
 }
 
 
@@ -351,7 +457,7 @@ int script_measure_move (unsigned char cmd_type, float cmd_width, float cmd_spee
 	memcpy(&payload[5], &cmd_speed, sizeof(float));
 
 	// Submit command and process result
-	res = cmd_submit(CMD_CUSTOM + cmd_type, payload, 9, true, &resp, &resp_len );
+	res = cmd_submit(CMD_CUSTOM + cmd_type, payload, 9, true, &resp, &resp_len);
 	try {
 		if (res < 2)
 			throw std::string("Invalid Response");
@@ -416,7 +522,8 @@ int setAcceleration( float acc )
 	memcpy( &payload[0], &acc, sizeof( float ) );
 
 	// Submit command and wait for response. Push result to stack.
-	res = cmd_submit( 0x30, payload, 4, true, &resp, &resp_len );
+	res = cmd_submit( 0x30, payload, 4, true, &resp, &resp_len);
+
 	if ( res != 2 )
 	{
 		dbgPrint( "Response payload length doesn't match (is %d, expected 2)\n", res );
@@ -486,7 +593,7 @@ const char * systemState( void )
 	memset( payload, 0, 3 );
 
 	// Submit command and wait for response. Expecting exactly 4 bytes response payload.
-	res = cmd_submit( 0x40, payload, 3, false, &resp, &resp_len );
+	res = cmd_submit( 0x40, payload, 3, false, &resp, &resp_len);
 	if ( res != 6 )
 	{
 		dbgPrint( "Response payload length doesn't match (is %d, expected 6)\n", res );
@@ -576,7 +683,8 @@ float getOpeningSpeedForce(unsigned char cmd, int auto_update)
     }
 
     // Submit command and wait for response. Expecting exactly 4 bytes response payload.
-    res = cmd_submit(cmd, payload, 3, false, &resp, &resp_len ); // 0x43
+    res = cmd_submit(cmd, payload, 3 , false, &resp, &resp_len ); // 0x43
+
     if (res != 6) {
         dbgPrint( "Response payload length doesn't match (is %d, expected 3)\n", res );
         if ( res > 0 ) free( resp );
@@ -634,7 +742,7 @@ int getAcceleration( void )
 	memset( payload, 0, 1 );
 
 	// Submit command and wait for response. Expecting exactly 4 bytes response payload.
-	res = cmd_submit( 0x31, payload, 0, false, &resp, &resp_len );
+	res = cmd_submit( 0x31, payload, 0, false,  &resp, &resp_len);
 	if ( res != 6 )
 	{
 		dbgPrint( "Response payload length doesn't match (is %d, expected 3)\n", res );

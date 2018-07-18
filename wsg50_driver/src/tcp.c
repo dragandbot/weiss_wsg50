@@ -51,6 +51,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "wsg50/interface.h"
 #include "wsg50/tcp.h"
@@ -77,10 +78,12 @@ const interface_t tcp =
 	.open = &tcp_open,
 	.close = &tcp_close,
 	.read = &tcp_read,
-	.write = &tcp_write
+	.write = &tcp_write,
+	.get_bytes_count = tcp_get_bytes_count
 };
 
 static tcp_conn_t conn;
+
 
 
 //------------------------------------------------------------------------
@@ -96,6 +99,7 @@ static tcp_conn_t conn;
 //------------------------------------------------------------------------
 // Function implementation
 //------------------------------------------------------------------------
+
 
 /**
  * Open TCP socket
@@ -124,6 +128,7 @@ int tcp_open( const void *params )
     conn.si_server.sin_port = htons( tcp->port );
     conn.si_server.sin_addr.s_addr = tcp->addr;
 
+
 	unsigned int val = 1024;
     setsockopt( conn.sock, SOL_SOCKET, SO_RCVBUF, (void *) &val, (socklen_t) sizeof( val ) );
 
@@ -149,6 +154,11 @@ void tcp_close( void )
 	conn.sock = 0;
 }
 
+int tcp_get_bytes_count( void ) {
+	int count;
+	if (ioctl(conn.sock, FIONREAD, &count) == -1) return -1;
+	return count;
+}
 
 /**
  * Read character from TCP socket
@@ -167,8 +177,10 @@ int tcp_read( unsigned char *buf, unsigned int len )
 	res = recv( conn.sock, buf, len, 0 );
 	if ( res < 0 )
 	{
+		// if (errno != EINTR) printf("Failed to read data from TCP socket: %s\n", strerror(errno));
 		close( conn.sock );
-		quit( "Failed to read data from TCP socket\n" );
+		quit("Failed to read data from TCP socket");
+
 	}
 
     return res;

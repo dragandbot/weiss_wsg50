@@ -153,6 +153,69 @@ int msg_receive( msg_t *msg )
 	return msg->len + 8;
 }
 
+//  returns 0 when no msg available, 1 when msg is available and correct, -1 on error
+int msg_receive_async( msg_t *msg ) {
+	int bytes_count = interface->get_bytes_count();
+	if ( bytes_count == 0) return 0;
+	if ( bytes_count < 0) return -1;
+	// fprintf( stdout, "Number of available bytes is %d \n", bytes_count);
+
+	int res;
+	unsigned char header[3];			// 1 byte command, 2 bytes payload length
+	unsigned short checksum = 0x50f5;	// Checksum over preamble (0xaa 0xaa 0xaa)
+	unsigned int sync;
+
+	// Syncing - necessary for compatibility with serial interface
+	sync = 0;
+	while( sync != MSG_PREAMBLE_LEN ) {
+		res = interface->read( header, 1 );
+		if ( header[0] == MSG_PREAMBLE_BYTE ) sync++;
+	}
+
+	// Read header
+	res = interface->read( header, 3 );
+	if (res < 0) {
+		return -1;
+	}
+	if ( res < 3 )
+	{
+		fprintf( stderr, "Failed to receive header data (%d bytes read)\n", res );
+		return -1;
+	}
+
+	// Calculate checksum over header
+	checksum = checksum_update_crc16( header, 3, checksum );
+
+	// Get message id of received
+	msg->id = header[0];
+
+	// Get payload size of received message
+	msg->len = make_short( header[1], header[2] );
+
+	// Allocate space for payload and checksum
+	msg->data = malloc( msg->len + 2u );
+	if ( !msg->data ) {
+		return -1;
+	}
+
+	// Read payload and checksum
+	res = interface->read( msg->data, msg->len + 2 );
+	if ( res < (int) (msg->len + 2) )
+	{
+		fprintf( stderr, "Not enough data (%d, expected %d)\n", res, msg->len + 2 );
+		return -1;
+	}
+
+	// Check checksum
+	checksum = checksum_update_crc16( msg->data, msg->len + 2, checksum );
+	if ( checksum != 0 )
+	{
+		fprintf( stderr, "Checksum error\n" );
+		return -1;
+	}
+
+	return 1;
+}
 
 /**
  * Send command

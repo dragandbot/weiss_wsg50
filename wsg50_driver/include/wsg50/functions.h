@@ -73,6 +73,13 @@ int grasp( float objWidth, float speed );
 int release( float width, float speed );
 int ack_fault( void );
 
+int homing_async( void );
+int move_async(float width, float speed, bool stop_on_block);
+int grasp_async(float objWidth, float speed);
+int release_async(float objWidth, float speed);
+int recv_ack ( unsigned char id, status_t* status );
+
+
 int setAcceleration( float acc );
 int setGraspingForceLimit( float force );
 

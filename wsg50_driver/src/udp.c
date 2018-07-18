@@ -76,7 +76,8 @@ const interface_t udp =
 	.open = &udp_open,
 	.close = &udp_close,
 	.read = &udp_read,
-	.write = &udp_write
+	.write = &udp_write,
+    .get_bytes_count = udp_get_bytes_count
 };
 
 static udp_conn_t conn;
@@ -152,6 +153,10 @@ void udp_close( void )
 	conn.sock = 0;
 }
 
+int udp_get_bytes_count( void ) {
+    // to be implemented if needed
+    return -1;
+}
 
 /**
  * Read character from UDP socket

@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find wsg50_driver)/launch/start.launch" />
+  <test test-name="autotest" pkg="wsg50_driver" type="autotest.py" />
+</launch>

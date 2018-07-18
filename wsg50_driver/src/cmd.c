@@ -94,7 +94,6 @@ static bool connected = false;
 // Function implementation
 //------------------------------------------------------------------------
 
-
 /**
  * Send command and wait for answer
  *
@@ -182,6 +181,100 @@ int cmd_submit( unsigned char id, unsigned char *payload, unsigned int len,
 	return (int) msg.len;
 }
 
+/**
+ * Send command and return immediately (do not read response)
+ *
+ * @param id		Command ID
+ * @param len		Payload length
+ * @param *payload	Payload data
+ *
+ * @return 0 on sucess, -1 on error.
+ */
+
+int cmd_submit_async( unsigned char id, unsigned char *payload, unsigned int len)
+{
+	int res;
+	status_t status;
+
+	// Assemble message struct
+	msg_t msg =
+	{
+		.id = id,
+		.len = len,
+		.data = payload
+	};
+
+	// Check if we're connected
+	if ( !connected ) {
+		fprintf( stderr, "Interface not connected\n" );
+		return -1;
+	}
+
+	// Send command
+	res = msg_send( &msg );
+	if ( res < 0 ) {
+		fprintf( stderr, "Message send failed\n" );
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Receive response of a previously sent command
+ *
+ * @param id				Original Command ID
+ * @param *response_len		Response length
+ * @param **response	    Response data
+ *
+ * returns 0 when no msg available, 1 when msg is available and correct, -1 on error
+ */
+int cmd_recv_ack ( unsigned char id, unsigned char **response, unsigned int *response_len){
+	int res;
+	msg_t msg;
+
+	// Reuse message struct to receive response
+	memset( &msg, 0, sizeof( msg ) );
+
+	// Check if we're connected
+	if ( !connected ) {
+		fprintf( stderr, "Interface not connected\n" );
+		return -1;
+	}
+
+	// Receive response data
+	res = msg_receive_async( &msg );
+	if ( res == 0 ) return 0;
+	if ( res < 0 ) return -1;
+
+	// Check response ID
+	if ( msg.id != id && msg.id != 0x22) {
+		fprintf( stderr, "Response ID (%2x) does not match submitted command ID (%2x)\n", msg.id, id );
+		return -1;
+	} 
+	// Ignore asyncronous responses of the stop command
+	if (msg.id != id && msg.id == 0x22) {
+		// Reuse message struct to receive response
+		memset( &msg, 0, sizeof( msg ) );
+		
+		// Retry to receive response data
+		res = msg_receive_async( &msg );
+		if ( res == 0 ) return 0;
+		if ( res < 0 ) return -1;
+
+		if ( msg.id != id ) {
+		fprintf( stderr, "Response ID (%2x) does not match submitted command ID (%2x)\n", msg.id, id );
+		return -1;
+	} 
+	}
+
+	// Return payload
+	*response_len = msg.len;
+	if ( msg.len > 0 ) *response = msg.data;
+	else *response = 0;
+
+	return 1;
+}
 
 /**
  * Open TCP connection
@@ -223,7 +316,6 @@ int cmd_connect_tcp( const char *addr, unsigned short port )
 
 	return 0;
 }
-
 
 /**
  * Open up UDP connection
@@ -323,7 +415,7 @@ void cmd_disconnect( void )
 
 	printf( "Closing connection\n" );
 
-	res = cmd_submit( 0x07, NULL, 0, false, &resp, &resp_len );
+	res = cmd_submit( 0x07, NULL, 0, false, &resp, &resp_len);
 	if ( res != 2 ) printf( "Disconnect announcement failed: Response payload length doesn't match (is %d, expected 2)\n", res );
 	else
 	{

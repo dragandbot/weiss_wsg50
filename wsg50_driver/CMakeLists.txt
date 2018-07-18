@@ -8,13 +8,15 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   std_srvs
+  dnb_msgs
   wsg50_common
+  dnb_msgs
 )
 
 catkin_package(
 #   INCLUDE_DIRS include
 #  LIBRARIES vh_pixelmap
-  CATKIN_DEPENDS roscpp std_msgs std_srvs wsg50_common
+  CATKIN_DEPENDS roscpp std_msgs std_srvs wsg50_common dnb_msgs
 #  DEPENDS system_lib
 )
 
@@ -66,7 +68,7 @@ endif()
 
 add_executable(wsg50 src/main.cpp ${DRIVER_SOURCES})
 target_link_libraries(wsg50 ${catkin_LIBRARIES})
-add_dependencies(wsg50 wsg50_common_gencpp)
+add_dependencies(wsg50 wsg50_common_generate_messages_cpp)
 
 #add_executable(wsg50_can src/main_can.cpp src/checksum.cpp src/msg.c src/common.cpp src/functions_can.cpp)
 #add_executable(wsg50_can src/main_can.cpp ${DRIVER_SOURCES_CAN})
@@ -76,4 +78,20 @@ add_dependencies(wsg50 wsg50_common_gencpp)
 #add_compile_flags(wsg50_can -g -Wall)
 #target_link_libraries(wsg50_can pcan)
 
+#############
+## Install ##
+#############
+install(
+  TARGETS wsg50
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY module_config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
+#############
+## Testing ##
+#############
+#if(CATKIN_ENABLE_TESTING)
+#  find_package(rostest REQUIRED)
+#  add_rostest(test/autotest.test)
+#endif()

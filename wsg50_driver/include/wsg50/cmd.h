@@ -67,8 +67,10 @@ bool cmd_is_connected( void );
 status_t cmd_get_response_status( unsigned char *response );
 
 int cmd_submit( unsigned char id, unsigned char *payload, unsigned int len,
-			    bool pending, unsigned char **response, unsigned int *response_len );
+ 			    bool pending, unsigned char **response, unsigned int *response_len );
 
+int cmd_submit_async( unsigned char id, unsigned char *payload, unsigned int len);
+int cmd_recv_ack( unsigned char id, unsigned char **response, unsigned int *response_len);
 
 #ifdef __cplusplus
 }

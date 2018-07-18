@@ -67,6 +67,7 @@ int serial_open( const void *params );
 void serial_close( void );
 int serial_read( unsigned char *buf, unsigned int len );
 int serial_write( unsigned char *buf, unsigned int len );
+int serial_get_bytes_count( void );
 
 
 #ifdef __cplusplus

@@ -1,4 +1,5 @@
 string direction
 float32 increment
 ---
+# error = 0 when successful , 1 if another motion control service is running (e.g Move.srv or Incr.srv), 255 on fail
 uint8 error
