@@ -460,7 +460,7 @@ bool ackSrv(std_srvs::Empty::Request &req, std_srvs::Empty::Request &res)
 {
     if (in_motion){
         ROS_WARN("Acknowledge fault is not allowed while gripper is in motion.");
-        return false;
+        return true;
     }
     ack_fault();
     return true;
