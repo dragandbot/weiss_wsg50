@@ -497,6 +497,10 @@ bool setForceSrv(wsg50_common::Conf::Request &req, wsg50_common::Conf::Response 
 
 bool ackSrv(std_srvs::Empty::Request &req, std_srvs::Empty::Request &res)
 {
+    if (in_motion){
+        ROS_WARN("Acknowledge fault is not allowed while gripper is in motion.");
+        return true;
+    }
     ack_fault();
     return true;
 }
